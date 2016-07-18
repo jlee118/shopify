@@ -3,6 +3,7 @@ require 'sinatra'
 require 'base64'
 require 'openssl'
 require 'httparty'
+require 'json'
 
 SHARED_SECRET = 'a2e5e6d5a356c6aa2f3db29046cd63cdd71ac02f8d0ff30fdbf567db575cbdde'
 API_KEY = '3807ea8d65c3831a591d35dbf1d2bb59'
