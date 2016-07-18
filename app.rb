@@ -30,16 +30,18 @@ post '/order' do
 	item_count = data['line_items'].count
 	for i in 0..(item_count - 1)
 		id = data['line_items'][i]['product_id']
-		puts "item id is #{id}"
 		product = ShopifyAPI::Product.find(id)
-		originalPrice = product.variants[0].compare_at_price.to_f
-		currentPrice = product.variants[0].price.to_f
-		if currentPrice > originalPrice * (1 - BID_MARGIN)
-			product.variants[0].price = currentPrice - originalPrice * BID_DECREMENT
-			puts "decrement is #{originalPrice * BID_DECREMENT}, new price is #{product.variants[0].price}"
-			product.save
-		else
-			puts "currently selling at floor price, no more discount!"
+		variantNumber = product.variants.count
+		for j in 0..(variantNumber - 1)
+			originalPrice = product.variants[j].compare_at_price.to_f
+			currentPrice = product.variants[j].price.to_f
+			if currentPrice > originalPrice * (1 - BID_MARGIN)
+				product.variants[j].price = (currentPrice - originalPrice * BID_DECREMENT).round(2)
+				puts "new price is #{product.variants[j].price}"
+				product.save
+			else
+				puts "currently selling at floor price, no more discount!"
+			end
 		end
 	end
 end
