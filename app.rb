@@ -1,49 +1,45 @@
-require 'rubygems'
 require 'sinatra'
-require 'base64'
 require 'openssl'
 require 'httparty'
 require 'json'
+#require 'base64'
+require 'shopify_api'
 
 SHARED_SECRET = 'a2e5e6d5a356c6aa2f3db29046cd63cdd71ac02f8d0ff30fdbf567db575cbdde'
 API_KEY = '3807ea8d65c3831a591d35dbf1d2bb59'
 PASSWORD = '068699831be90deba1024bfc1242ab49'
 STORE_NAME = 'test-store-1737.myshopify.com'
+URL = "https://#{API_KEY}:#{PASSWORD}@#{STORE_NAME}/admin"
+ShopifyAPI::Base.site = URL
+BID_MARGIN = 0.2
+BID_DECREMENT = 0.004
 
-helpers do
-  # Compare the computed HMAC digest based on the shared secret and the request contents
-  # to the reported HMAC in the headers
+# helpers do
+#   def verify_webhook(data, hmac_header)
+#     digest  = OpenSSL::Digest.new('sha256')
+#     calculated_hmac = Base64.encode64(OpenSSL::HMAC.digest(digest, SHARED_SECRET, data)).strip
+#     calculated_hmac == hmac_header
+#   end
+# end
 
-  def verify_webhook(data, hmac_header)
-    digest  = OpenSSL::Digest::Digest.new('sha256')
-    calculated_hmac = Base64.encode64(OpenSSL::HMAC.digest(digest, SHARED_SECRET, data)).strip
-    calculated_hmac == hmac_header
-  end
-end
-
-# Respond to HTTP POST requests sent to this web service
-post '/' do
-  request.body.rewind
-  data = request.body.read
-  verified = verify_webhook(data, env["HTTP_X_SHOPIFY_HMAC_SHA256"])
-
-  # Output 'true' or 'false'
-  puts "Webhook verified: #{verified}"
-end
-
-get '/order' do
+post '/order' do
 	request.body.rewind
 	data = JSON.parse request.body.read
+	#puts JSON.pretty_generate(data)
+	#verified = verify_webhook(data, env["HTTP_X_SHOPIFY_HMAC_SHA256"])
 	item_count = data['line_items'].count
-	item_ids = Array.new(item_count)
-	item_price = Array.new(item_count)
 	for i in 0..(item_count - 1)
-		id = data['line_item'][i]['id']
-		url = "https://#{API_KEY}:#{PASSWORD}@#{STORE_NAME}/admin/products.json"
-		response = HTTParty.get(url).parsed.response	
-		price = 
-		item_ids[i] = data['line_item'][i]['id']
-		item_price[i] = data['line_item'][i]['id']
-	
-
+		id = data['line_items'][i]['product_id']
+		puts "item id is #{id}"
+		product = ShopifyAPI::Product.find(id)
+		originalPrice = product.variants[0].compare_at_price.to_f
+		currentPrice = product.variants[0].price.to_f
+		if currentPrice > originalPrice * (1 - BID_MARGIN)
+			product.variants[0].price = currentPrice - originalPrice * BID_DECREMENT
+			puts "decrement is #{originalPrice * BID_DECREMENT}, new price is #{product.variants[0].price}"
+			product.save
+		else
+			puts "currently selling at floor price, no more discount!"
+		end
+	end
 end
